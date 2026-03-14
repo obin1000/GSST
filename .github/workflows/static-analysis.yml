@@ -1,0 +1,106 @@
+# =============================================================================
+# GSST — Static Analysis Pipeline
+# =============================================================================
+# Runs clang-tidy on the codebase using the compile_commands.json from the
+# CUDA build. Triggered on PRs and weekly schedule.
+# =============================================================================
+
+name: Static Analysis
+
+on:
+    pull_request:
+        branches: [main, develop]
+        paths:
+            - "**.hpp"
+            - "**.h"
+            - "**.cpp"
+            - "**.cu"
+            - "**.cuh"
+            - ".clang-tidy"
+    schedule:
+        - cron: "0 6 * * 1" # Weekly on Monday at 06:00 UTC
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    clang-tidy:
+        name: Clang-Tidy
+        runs-on: ubuntu-24.04
+        container:
+            image: nvidia/cuda:12.6.3-devel-ubuntu24.04
+        env:
+            DEBIAN_FRONTEND: noninteractive
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install tools
+              run: |
+                  apt-get update -qq
+                  apt-get install -y --no-install-recommends \
+                    cmake ninja-build g++ git ca-certificates \
+                    clang-tidy-18 libomp-dev
+
+            - name: Configure (generate compile_commands.json)
+              run: >
+                  cmake -B build -G Ninja
+                  -DCMAKE_BUILD_TYPE=Release
+                  -DCMAKE_CUDA_ARCHITECTURES=80
+                  -DGSST_BUILD_TESTS=ON
+                  -DGSST_BUILD_BENCHMARKS=OFF
+                  -DGSST_BUILD_EXAMPLES=OFF
+                  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+            - name: Build (needed for generated headers)
+              run: cmake --build build --parallel
+
+            - name: Run clang-tidy
+              run: |
+                  find include src \
+                    -type f \( -name '*.hpp' -o -name '*.h' -o -name '*.cpp' \) \
+                    -exec clang-tidy-18 -p build --config-file=.clang-tidy {} + \
+                    2>&1 | tee clang-tidy-output.txt
+
+            - name: Upload clang-tidy results
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: clang-tidy-report
+                  path: clang-tidy-output.txt
+                  retention-days: 14
+
+    cppcheck:
+        name: Cppcheck
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install cppcheck
+              run: |
+                  sudo apt-get update -qq
+                  sudo apt-get install -y --no-install-recommends cppcheck
+
+            - name: Run cppcheck
+              run: |
+                  cppcheck \
+                    --enable=warning,style,performance,portability \
+                    --suppress=missingIncludeSystem \
+                    --suppress=unmatchedSuppression \
+                    --inline-suppr \
+                    --std=c++20 \
+                    -I include \
+                    --error-exitcode=1 \
+                    --xml --xml-version=2 \
+                    src/ include/ \
+                    2> cppcheck-report.xml || true
+
+            - name: Upload cppcheck results
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: cppcheck-report
+                  path: cppcheck-report.xml
+                  retention-days: 14

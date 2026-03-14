@@ -1,0 +1,121 @@
+# =============================================================================
+# GSST — Clang-Format Configuration
+# =============================================================================
+# Based on LLVM style with project-specific tweaks for CUDA/C++20 code.
+# Run:  clang-format -i src/**/*.cu include/**/*.hpp include/**/*.cuh
+# =============================================================================
+
+Language: Cpp
+BasedOnStyle: LLVM
+
+# --- Layout ----------------------------------------------------------------
+ColumnLimit: 120
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4
+
+# --- Braces ----------------------------------------------------------------
+BreakBeforeBraces: Attach
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortEnumsOnASingleLine: true
+AllowShortLambdasOnASingleLine: All
+
+# --- Alignment -------------------------------------------------------------
+AlignAfterOpenBracket: Align
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignConsecutiveMacros: true
+AlignOperands: Align
+AlignTrailingComments: true
+
+# --- Includes ---------------------------------------------------------------
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Project headers
+  - Regex: '^"gsst/'
+    Priority: 1
+  # CUDA headers
+  - Regex: "^<(cuda|cooperative_groups|cub|thrust).*>"
+    Priority: 2
+  # C++ standard library
+  - Regex: "^<.*>"
+    Priority: 3
+  # Catch-all
+  - Regex: ".*"
+    Priority: 4
+
+SortIncludes: CaseSensitive
+SortUsingDeclarations: true
+
+# --- Spaces -----------------------------------------------------------------
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeCpp11BracedList: false
+SpaceBeforeParens: ControlStatements
+SpaceBeforeRangeBasedForLoopColon: true
+SpaceInEmptyBlock: false
+SpacesBeforeTrailingComments: 2
+SpacesInAngles: Never
+SpacesInContainerLiterals: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# --- Other ------------------------------------------------------------------
+BinPackArguments: true
+BinPackParameters: true
+BreakConstructorInitializers: BeforeColon
+BreakInheritanceList: BeforeColon
+CompactNamespaces: false
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+EmptyLineAfterAccessModifier: Never
+EmptyLineBeforeAccessModifier: LogicalBlock
+FixNamespaceComments: true
+IndentCaseLabels: false
+IndentPPDirectives: None
+InsertBraces: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: None
+PackConstructorInitializers: BinPack
+PointerAlignment: Left
+QualifierAlignment: Left
+ReferenceAlignment: Left
+ReflowComments: true
+SeparateDefinitionBlocks: Leave
+
+# --- Penalties --------------------------------------------------------------
+PenaltyBreakAssignment: 2
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakString: 1000
+PenaltyBreakTemplateDeclaration: 10
+PenaltyExcessCharacter: 1000000
+PenaltyReturnTypeOnItsOwnLine: 60
+
+# --- CUDA-specific ----------------------------------------------------------
+# Treat CUDA kernel launch syntax <<< >>> correctly
+ForEachMacros:
+  - GSST_CUDA_CHECK
+  - GSST_CUDA_CHECK_LAST
+
+AttributeMacros:
+  - __global__
+  - __device__
+  - __host__
+  - __shared__
+  - __constant__
+  - __managed__
+  - __forceinline__
+
+StatementAttributeLikeMacros:
+  - __launch_bounds__

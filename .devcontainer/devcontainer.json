@@ -1,0 +1,78 @@
+// =============================================================================
+// GSST — Dev Container Configuration
+// =============================================================================
+// Provides a reproducible CUDA development environment in VS Code.
+// Requirements: Docker, NVIDIA Container Toolkit, VS Code Dev Containers ext.
+//
+// Usage: Open folder in VS Code → "Reopen in Container"
+// =============================================================================
+{
+    "name": "GSST Development",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": "..",
+        "args": {
+            "CUDA_VERSION": "12.6.3",
+            "UBUNTU_VERSION": "24.04"
+        }
+    },
+    // GPU access
+    "runArgs": [
+        "--gpus=all",
+        "--shm-size=2g"
+    ],
+    // VS Code settings inside the container
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "cmake.configureOnOpen": true,
+                "cmake.generator": "Ninja",
+                "cmake.buildDirectory": "${workspaceFolder}/build",
+                "cmake.configureSettings": {
+                    "CMAKE_CUDA_ARCHITECTURES": "80;86;89;90",
+                    "GSST_BUILD_TESTS": "ON",
+                    "GSST_BUILD_BENCHMARKS": "ON",
+                    "GSST_BUILD_EXAMPLES": "ON"
+                },
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+                "clangd.arguments": [
+                    "--background-index",
+                    "--clang-tidy",
+                    "--header-insertion=iwyu",
+                    "--completion-style=detailed",
+                    "--function-arg-placeholders",
+                    "--compile-commands-dir=${workspaceFolder}/build"
+                ],
+                "files.associations": {
+                    "*.cu": "cuda-cpp",
+                    "*.cuh": "cuda-cpp"
+                },
+                "testMate.cpp.test.executables": "${workspaceFolder}/build/test/gsst_*"
+            },
+            "extensions": [
+                "llvm-vs-code-extensions.vscode-clangd",
+                "ms-vscode.cmake-tools",
+                "ms-vscode.cpptools",
+                "nvidia.nsight-vscode-edition"
+            ]
+        }
+    },
+    // Post-create: configure the build
+    "postCreateCommand": "cmake --preset default",
+    // Mount caches for faster rebuilds
+    "mounts": [
+        "source=gsst-build-cache,target=/workspaces/GSST/build,type=volume",
+        "source=gsst-ccache,target=/root/.cache/ccache,type=volume"
+    ],
+    // Features
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:2": {
+            "installZsh": true,
+            "configureZshAsDefaultShell": true
+        },
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    "remoteUser": "root"
+}

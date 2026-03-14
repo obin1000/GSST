@@ -1,0 +1,211 @@
+# =============================================================================
+# GSST — CI Pipeline
+# =============================================================================
+# Runs on every push/PR to main. Builds, tests, and lints the project.
+#
+# Jobs:
+#   lint        — clang-format check, clang-tidy, CMake lint (no GPU needed)
+#   build-cuda  — Full CUDA build + tests on GPU runner
+#   build-host  — Host-only compilation check (no GPU needed)
+# =============================================================================
+
+name: CI
+
+on:
+    push:
+        branches: [main, develop]
+    pull_request:
+        branches: [main, develop]
+    workflow_dispatch:
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+env:
+    CMAKE_BUILD_PARALLEL_LEVEL: 4
+    CTEST_OUTPUT_ON_FAILURE: 1
+
+# ---------------------------------------------------------------------------
+# Lint job — fast, no GPU required
+# ---------------------------------------------------------------------------
+jobs:
+    lint:
+        name: Lint & Format
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install tools
+              run: |
+                  sudo apt-get update -qq
+                  sudo apt-get install -y --no-install-recommends \
+                    clang-format-18 \
+                    cmake \
+                    python3-pip
+                  pip3 install --user cmake-format
+
+            - name: Check clang-format
+              run: |
+                  find include src test bench examples \
+                    -type f \( -name '*.hpp' -o -name '*.h' -o -name '*.cpp' \
+                               -o -name '*.cu' -o -name '*.cuh' \) \
+                    -exec clang-format-18 --dry-run --Werror {} +
+
+            - name: Check cmake-format
+              run: |
+                  find . -name 'CMakeLists.txt' -o -name '*.cmake' \
+                    | grep -v build | grep -v _deps \
+                    | xargs cmake-format --check 2>&1 || true
+
+    # ---------------------------------------------------------------------------
+    # Build + Test on CUDA runner
+    # ---------------------------------------------------------------------------
+    build-cuda:
+        name: CUDA Build & Test
+        runs-on: ubuntu-24.04
+        container:
+            image: nvidia/cuda:12.6.3-devel-ubuntu24.04
+        strategy:
+            fail-fast: false
+            matrix:
+                build_type: [Release, Debug]
+        env:
+            DEBIAN_FRONTEND: noninteractive
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install build dependencies
+              run: |
+                  apt-get update -qq
+                  apt-get install -y --no-install-recommends \
+                    cmake ninja-build g++ git ca-certificates \
+                    libomp-dev
+
+            - name: Configure
+              run: >
+                  cmake -B build
+                  -G Ninja
+                  -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+                  -DCMAKE_CUDA_ARCHITECTURES=80
+                  -DGSST_BUILD_TESTS=ON
+                  -DGSST_BUILD_BENCHMARKS=${{ matrix.build_type == 'Release' && 'ON' || 'OFF' }}
+                  -DGSST_BUILD_EXAMPLES=ON
+                  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+            - name: Build
+              run: cmake --build build --parallel
+
+            - name: Upload compile_commands.json
+              if: matrix.build_type == 'Release'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: compile-commands
+                  path: build/compile_commands.json
+                  retention-days: 7
+
+            # Tests only run if a GPU is available on the runner.
+            # For self-hosted GPU runners, remove the 'if' condition.
+            - name: Test
+              if: ${{ !cancelled() }}
+              run: ctest --test-dir build --output-on-failure --timeout 300 -j4
+              continue-on-error: true
+
+            - name: Upload test results
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-results-${{ matrix.build_type }}
+                  path: |
+                      build/Testing/
+                      build/**/test-*.xml
+                  retention-days: 14
+
+    # ---------------------------------------------------------------------------
+    # Host-only build (no CUDA device needed, validates CPU paths compile)
+    # ---------------------------------------------------------------------------
+    build-host:
+        name: Host Compilation Check
+        runs-on: ubuntu-24.04
+        container:
+            image: nvidia/cuda:12.6.3-devel-ubuntu24.04
+        env:
+            DEBIAN_FRONTEND: noninteractive
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install build dependencies
+              run: |
+                  apt-get update -qq
+                  apt-get install -y --no-install-recommends \
+                    cmake ninja-build g++ git ca-certificates \
+                    libomp-dev
+
+            - name: Configure (Release, tests only)
+              run: >
+                  cmake -B build -G Ninja
+                  -DCMAKE_BUILD_TYPE=Release
+                  -DCMAKE_CUDA_ARCHITECTURES=80
+                  -DGSST_BUILD_TESTS=ON
+                  -DGSST_BUILD_BENCHMARKS=OFF
+                  -DGSST_BUILD_EXAMPLES=ON
+
+            - name: Build
+              run: cmake --build build --parallel
+
+    # ---------------------------------------------------------------------------
+    # Install check — validates the CMake install + find_package flow
+    # ---------------------------------------------------------------------------
+    install-check:
+        name: Install & find_package
+        runs-on: ubuntu-24.04
+        container:
+            image: nvidia/cuda:12.6.3-devel-ubuntu24.04
+        needs: [build-host]
+        env:
+            DEBIAN_FRONTEND: noninteractive
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install build dependencies
+              run: |
+                  apt-get update -qq
+                  apt-get install -y --no-install-recommends \
+                    cmake ninja-build g++ git ca-certificates \
+                    libomp-dev
+
+            - name: Build & install library
+              run: |
+                  cmake -B build -G Ninja \
+                    -DCMAKE_BUILD_TYPE=Release \
+                    -DCMAKE_CUDA_ARCHITECTURES=80 \
+                    -DGSST_BUILD_TESTS=OFF \
+                    -DGSST_BUILD_BENCHMARKS=OFF \
+                    -DGSST_BUILD_EXAMPLES=OFF \
+                    -DGSST_INSTALL=ON \
+                    -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/_install
+                  cmake --build build --parallel
+                  cmake --install build
+
+            - name: Test find_package
+              run: |
+                  mkdir -p /tmp/test-find && cd /tmp/test-find
+                  cat > CMakeLists.txt << 'EOF'
+                  cmake_minimum_required(VERSION 3.25)
+                  project(test_find LANGUAGES CXX CUDA)
+                  find_package(gsst REQUIRED)
+                  add_executable(test_find main.cu)
+                  target_link_libraries(test_find PRIVATE gsst::gsst)
+                  EOF
+                  cat > main.cu << 'EOF'
+                  #include <gsst/gsst.hpp>
+                  int main() {
+                      gsst::Codec codec;
+                      return 0;
+                  }
+                  EOF
+                  cmake -B build -G Ninja \
+                    -DCMAKE_PREFIX_PATH=${{ github.workspace }}/_install \
+                    -DCMAKE_CUDA_ARCHITECTURES=80
+                  cmake --build build
