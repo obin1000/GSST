@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 4.1)
 project(gsst
     VERSION 0.1.0
     DESCRIPTION "GPU-accelerated FSST string compression and decompression"
-    LANGUAGES CXX CUDA
+    LANGUAGES CXX CUDA C
 )
 
 # ---------------------------------------------------------------------------
@@ -26,6 +26,8 @@ option(GSST_BUILD_BENCHMARKS "Build benchmarks"                ON)
 option(GSST_BUILD_EXAMPLES   "Build example programs"          ON)
 option(GSST_INSTALL          "Generate install targets"        ON)
 option(GSST_USE_NVCOMP       "Enable nvCOMP baseline support"  OFF)
+option(GSST_ENABLE_CLANG_TIDY "Run clang-tidy during build"    OFF)
+option(GSST_ENABLE_CPPCHECK   "Run cppcheck during build"     OFF)
 
 # ---------------------------------------------------------------------------
 # C++ and CUDA standards
@@ -96,7 +98,6 @@ endif()
 
 find_package(CUDAToolkit REQUIRED)
 find_package(Threads REQUIRED)
-find_package(OpenMP REQUIRED)
 
 include(cmake/dependencies.cmake)
 
@@ -125,7 +126,6 @@ target_link_libraries(gsst
     PUBLIC
         CUDA::cudart
         Threads::Threads
-        OpenMP::OpenMP_CXX
 )
 
 target_compile_features(gsst PUBLIC cxx_std_20 cuda_std_20)
@@ -179,6 +179,36 @@ if(GSST_INSTALL)
         ${CMAKE_CURRENT_BINARY_DIR}/gsst-config-version.cmake
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/gsst
     )
+endif()
+
+# ---------------------------------------------------------------------------
+# Static analysis (applied to targets defined below, not third-party deps)
+# ---------------------------------------------------------------------------
+if(GSST_ENABLE_CLANG_TIDY)
+    find_program(CLANG_TIDY_EXE NAMES clang-tidy clang-tidy-18 clang-tidy-19)
+    if(CLANG_TIDY_EXE)
+        message(STATUS "clang-tidy found: ${CLANG_TIDY_EXE}")
+        set(CMAKE_CXX_CLANG_TIDY
+            "${CLANG_TIDY_EXE}" "--config-file=${CMAKE_SOURCE_DIR}/.clang-tidy")
+    else()
+        message(WARNING "GSST_ENABLE_CLANG_TIDY is ON but clang-tidy not found")
+    endif()
+endif()
+
+if(GSST_ENABLE_CPPCHECK)
+    find_program(CPPCHECK_EXE NAMES cppcheck)
+    if(CPPCHECK_EXE)
+        message(STATUS "cppcheck found: ${CPPCHECK_EXE}")
+        set(CMAKE_CXX_CPPCHECK
+            "${CPPCHECK_EXE}"
+            "--enable=warning,style,performance,portability"
+            "--suppress=missingIncludeSystem"
+            "--suppress=unmatchedSuppression"
+            "--inline-suppr"
+            "--std=c++20")
+    else()
+        message(WARNING "GSST_ENABLE_CPPCHECK is ON but cppcheck not found")
+    endif()
 endif()
 
 # ---------------------------------------------------------------------------

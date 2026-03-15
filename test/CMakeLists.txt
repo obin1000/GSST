@@ -38,3 +38,8 @@ gtest_discover_tests(gsst_c_api_test)
 add_executable(gsst_codec_test codec_test.cpp)
 target_link_libraries(gsst_codec_test PRIVATE gsst::gsst GTest::gtest_main)
 gtest_discover_tests(gsst_codec_test)
+
+# Compression quality and encoder tests
+add_executable(gsst_compression_test compression_test.cpp)
+target_link_libraries(gsst_compression_test PRIVATE gsst::gsst GTest::gtest_main)
+gtest_discover_tests(gsst_compression_test)

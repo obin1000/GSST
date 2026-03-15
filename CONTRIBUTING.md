@@ -55,6 +55,7 @@ pre-commit run --all-files
 ```
 
 This checks:
+
 - **clang-format** — C++/CUDA code style
 - **cmake-format** — CMake file style
 - **trailing whitespace**, **end-of-file**, **merge conflicts**
@@ -87,13 +88,14 @@ ctest --test-dir build --output-on-failure
 ```
 
 When adding new functionality:
+
 1. Add unit tests in `test/`
 2. Ensure existing tests still pass
 3. Add benchmarks in `bench/` for performance-sensitive code
 
 ## Project Structure
 
-```
+```text
 ├── .github/workflows/    # CI/CD pipelines
 ├── .devcontainer/        # Dev container setup
 ├── cmake/                # CMake modules

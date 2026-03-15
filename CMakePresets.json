@@ -7,18 +7,32 @@
     },
     "configurePresets": [
         {
+            "name": "ninja-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER": "clang-cl",
+                "CMAKE_C_COMPILER": "clang-cl",
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
             "name": "default",
+            "inherits": "ninja-base",
             "displayName": "Default (Release)",
             "binaryDir": "${sourceDir}/build",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release",
                 "GSST_BUILD_TESTS": "ON",
                 "GSST_BUILD_BENCHMARKS": "ON",
-                "GSST_BUILD_EXAMPLES": "ON"
+                "GSST_BUILD_EXAMPLES": "ON",
+                "GSST_ENABLE_CLANG_TIDY": "ON",
+                "GSST_ENABLE_CPPCHECK": "ON"
             }
         },
         {
             "name": "debug",
+            "inherits": "ninja-base",
             "displayName": "Debug",
             "binaryDir": "${sourceDir}/build-debug",
             "cacheVariables": {
@@ -30,6 +44,7 @@
         },
         {
             "name": "release",
+            "inherits": "ninja-base",
             "displayName": "Release (no extras)",
             "binaryDir": "${sourceDir}/build-release",
             "cacheVariables": {
@@ -41,6 +56,7 @@
         },
         {
             "name": "ci",
+            "inherits": "ninja-base",
             "displayName": "CI",
             "binaryDir": "${sourceDir}/build-ci",
             "cacheVariables": {
@@ -49,11 +65,13 @@
                 "GSST_BUILD_TESTS": "ON",
                 "GSST_BUILD_BENCHMARKS": "ON",
                 "GSST_BUILD_EXAMPLES": "ON",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+                "GSST_ENABLE_CLANG_TIDY": "ON",
+                "GSST_ENABLE_CPPCHECK": "ON"
             }
         },
         {
             "name": "ci-debug",
+            "inherits": "ninja-base",
             "displayName": "CI Debug",
             "binaryDir": "${sourceDir}/build-ci-debug",
             "cacheVariables": {
@@ -61,22 +79,7 @@
                 "CMAKE_CUDA_ARCHITECTURES": "80",
                 "GSST_BUILD_TESTS": "ON",
                 "GSST_BUILD_BENCHMARKS": "OFF",
-                "GSST_BUILD_EXAMPLES": "ON",
-                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-            }
-        },
-        {
-            "name": "sanitize",
-            "displayName": "Debug + Sanitizers",
-            "binaryDir": "${sourceDir}/build-sanitize",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug",
-                "CMAKE_CUDA_ARCHITECTURES": "80",
-                "GSST_BUILD_TESTS": "ON",
-                "GSST_BUILD_BENCHMARKS": "OFF",
-                "GSST_BUILD_EXAMPLES": "OFF",
-                "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-omit-frame-pointer",
-                "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address,undefined"
+                "GSST_BUILD_EXAMPLES": "ON"
             }
         }
     ],
@@ -100,10 +103,6 @@
         {
             "name": "ci-debug",
             "configurePreset": "ci-debug"
-        },
-        {
-            "name": "sanitize",
-            "configurePreset": "sanitize"
         }
     ],
     "testPresets": [
