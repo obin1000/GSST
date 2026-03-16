@@ -4,7 +4,10 @@
 // Measures compression throughput (GB/s) and compression ratio for various
 // data patterns and sizes.
 // =============================================================================
+#include <algorithm>
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <cstdint>
 #include <gsst/gsst.hpp>
 #include <random>
 #include <string>
@@ -19,18 +22,17 @@ static std::vector<uint8_t> gen_repetitive(size_t size) {
     std::vector<uint8_t> data;
     data.reserve(size);
     while (data.size() < size) {
-        size_t chunk = std::min(pattern.size(), size - data.size());
-        data.insert(data.end(), pattern.begin(), pattern.begin() + chunk);
+        const size_t chunk = std::min(pattern.size(), size - data.size());
+        data.insert(data.end(), pattern.begin(), pattern.begin() + static_cast<std::ptrdiff_t>(chunk));
     }
     return data;
 }
 
 static std::vector<uint8_t> gen_random(size_t size, int alphabet = 256) {
-    std::mt19937 rng(123);
+    std::mt19937 rng(123);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
     std::uniform_int_distribution<int> dist(0, alphabet - 1);
     std::vector<uint8_t> data(size);
-    for (auto& b : data)
-        b = static_cast<uint8_t>(dist(rng));
+    std::ranges::generate(data, [&]() { return static_cast<uint8_t>(dist(rng)); });
     return data;
 }
 
@@ -38,12 +40,12 @@ static std::vector<uint8_t> gen_csv(size_t target_size) {
     std::string csv;
     csv.reserve(target_size + 1024);
     csv += "id,name,value,timestamp,status\n";
-    std::mt19937 rng(42);
+    std::mt19937 rng(42);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
     for (int row = 0; csv.size() < target_size; ++row) {
         csv += std::to_string(row) + ",";
         csv += "item_" + std::to_string(rng() % 100) + ",";
         csv += std::to_string(rng() % 10000) + "." + std::to_string(rng() % 100) + ",";
-        csv += "2024-01-" + std::to_string(1 + rng() % 28) + ",";
+        csv += "2024-01-" + std::to_string(1 + (rng() % 28)) + ",";
         csv += (rng() % 2 == 0 ? "active" : "inactive");
         csv += "\n";
     }
@@ -59,9 +61,9 @@ static std::vector<uint8_t> gen_uniform(size_t size) {
 // Benchmarks
 // ---------------------------------------------------------------------------
 static void BM_CompressRepetitive(benchmark::State& state) {
-    const size_t size = static_cast<size_t>(state.range(0));
+    const auto size = static_cast<size_t>(state.range(0));
     auto data = gen_repetitive(size);
-    gsst::Codec codec;
+    const gsst::Codec codec;
     const size_t bound = gsst::compress_bound(size);
     std::vector<uint8_t> compressed(bound);
     size_t last_compressed_size = 0;
@@ -80,9 +82,9 @@ static void BM_CompressRepetitive(benchmark::State& state) {
 }
 
 static void BM_CompressRandom(benchmark::State& state) {
-    const size_t size = static_cast<size_t>(state.range(0));
+    const auto size = static_cast<size_t>(state.range(0));
     auto data = gen_random(size);
-    gsst::Codec codec;
+    const gsst::Codec codec;
     const size_t bound = gsst::compress_bound(size);
     std::vector<uint8_t> compressed(bound);
     size_t last_compressed_size = 0;
@@ -101,9 +103,9 @@ static void BM_CompressRandom(benchmark::State& state) {
 }
 
 static void BM_CompressLowEntropy(benchmark::State& state) {
-    const size_t size = static_cast<size_t>(state.range(0));
+    const auto size = static_cast<size_t>(state.range(0));
     auto data = gen_random(size, 10);  // Only 10 distinct values
-    gsst::Codec codec;
+    const gsst::Codec codec;
     const size_t bound = gsst::compress_bound(size);
     std::vector<uint8_t> compressed(bound);
     size_t last_compressed_size = 0;
@@ -122,9 +124,9 @@ static void BM_CompressLowEntropy(benchmark::State& state) {
 }
 
 static void BM_CompressCsv(benchmark::State& state) {
-    const size_t size = static_cast<size_t>(state.range(0));
+    const auto size = static_cast<size_t>(state.range(0));
     auto data = gen_csv(size);
-    gsst::Codec codec;
+    const gsst::Codec codec;
     const size_t bound = gsst::compress_bound(size);
     std::vector<uint8_t> compressed(bound);
     size_t last_compressed_size = 0;
@@ -143,9 +145,9 @@ static void BM_CompressCsv(benchmark::State& state) {
 }
 
 static void BM_CompressUniform(benchmark::State& state) {
-    const size_t size = static_cast<size_t>(state.range(0));
+    const auto size = static_cast<size_t>(state.range(0));
     auto data = gen_uniform(size);
-    gsst::Codec codec;
+    const gsst::Codec codec;
     const size_t bound = gsst::compress_bound(size);
     std::vector<uint8_t> compressed(bound);
     size_t last_compressed_size = 0;
@@ -164,10 +166,11 @@ static void BM_CompressUniform(benchmark::State& state) {
 }
 
 // Benchmark different layouts
+// NOLINTNEXTLINE(readability-identifier-naming)
 static void BM_CompressLayouts(benchmark::State& state) {
     const size_t size = 1 << 20;  // 1 MiB
     auto data = gen_repetitive(size);
-    gsst::Codec codec;
+    const gsst::Codec codec;
     const size_t bound = gsst::compress_bound(size);
     std::vector<uint8_t> compressed(bound);
 

@@ -1,11 +1,16 @@
 // =============================================================================
 // GSST — Roundtrip (compress → decompress) tests
 // =============================================================================
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <gsst/gsst.hpp>
 #include <gtest/gtest.h>
 #include <numeric>
 #include <random>
 #include <string>
+#include <string_view>
 #include <vector>
 
 
@@ -22,18 +27,17 @@ static std::vector<uint8_t> make_repetitive(const std::string &pattern,
   std::vector<uint8_t> data;
   data.reserve(target_size);
   while (data.size() < target_size) {
-    size_t chunk = std::min(pattern.size(), target_size - data.size());
-    data.insert(data.end(), pattern.begin(), pattern.begin() + chunk);
+    const size_t chunk = std::min(pattern.size(), target_size - data.size());
+    data.insert(data.end(), pattern.begin(), pattern.begin() + static_cast<std::ptrdiff_t>(chunk));
   }
   return data;
 }
 
 static std::vector<uint8_t> make_random(size_t size, int alphabet_size = 256) {
-  std::mt19937 rng(42);
+  std::mt19937 rng(42);  // NOLINT(cert-msc32-c,cert-msc51-cpp)
   std::uniform_int_distribution<int> dist(0, alphabet_size - 1);
   std::vector<uint8_t> data(size);
-  for (auto &b : data)
-    b = static_cast<uint8_t>(dist(rng));
+  std::ranges::generate(data, [&]() { return static_cast<uint8_t>(dist(rng)); });
   return data;
 }
 
@@ -48,7 +52,7 @@ static std::vector<uint8_t> make_sequential(size_t size) {
 // ---------------------------------------------------------------------------
 
 TEST_F(RoundtripTest, SmallString) {
-  std::string input = "Hello, GSST! This is a test string.";
+  const std::string input = "Hello, GSST! This is a test string.";
   auto compressed = codec.compress(input);
   ASSERT_FALSE(compressed.empty()) << "Compression failed";
 
@@ -60,7 +64,7 @@ TEST_F(RoundtripTest, SmallString) {
 TEST_F(RoundtripTest, RepetitiveData) {
   auto data =
       make_repetitive("The quick brown fox jumps over the lazy dog. ", 100000);
-  std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
+  const std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
 
   auto compressed = codec.compress(sv);
   ASSERT_FALSE(compressed.empty());
@@ -76,7 +80,7 @@ TEST_F(RoundtripTest, RepetitiveData) {
 
 TEST_F(RoundtripTest, RandomDataSmallAlphabet) {
   auto data = make_random(50000, 10); // Only 10 distinct byte values
-  std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
+  const std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
 
   auto compressed = codec.compress(sv);
   ASSERT_FALSE(compressed.empty());
@@ -89,7 +93,7 @@ TEST_F(RoundtripTest, RandomDataSmallAlphabet) {
 
 TEST_F(RoundtripTest, RandomDataFullAlphabet) {
   auto data = make_random(50000, 256);
-  std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
+  const std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
 
   auto compressed = codec.compress(sv);
   ASSERT_FALSE(compressed.empty());
@@ -133,7 +137,7 @@ TEST_F(RoundtripTest, BlocksLayout) {
   opts.layout = gsst::Layout::Blocks;
   opts.num_blocks = 4;
 
-  std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
+  const std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
   auto compressed = codec.compress(sv, opts);
   ASSERT_FALSE(compressed.empty());
 
@@ -150,7 +154,7 @@ TEST_F(RoundtripTest, SplitsLayout) {
   opts.num_blocks = 4;
   opts.splits_per_block = 8;
 
-  std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
+  const std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
   auto compressed = codec.compress(sv, opts);
   ASSERT_FALSE(compressed.empty());
 
@@ -167,7 +171,7 @@ TEST_F(RoundtripTest, CoalesceLayout) {
   opts.num_blocks = 4;
   opts.splits_per_block = 16;
 
-  std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
+  const std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
   auto compressed = codec.compress(sv, opts);
   ASSERT_FALSE(compressed.empty());
 
@@ -182,14 +186,14 @@ TEST_F(RoundtripTest, CoalesceLayout) {
 // ---------------------------------------------------------------------------
 
 TEST_F(RoundtripTest, GetDecompressedSize) {
-  std::string input = "Size query test data repeated several times. ";
+  const std::string input = "Size query test data repeated several times. ";
   auto data = make_repetitive(input, 10000);
-  std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
+  const std::string_view sv(reinterpret_cast<const char *>(data.data()), data.size());
 
   auto compressed = codec.compress(sv);
   ASSERT_FALSE(compressed.empty());
 
-  size_t reported_size =
+  const size_t reported_size =
       gsst::get_decompressed_size(compressed.data(), compressed.size());
   EXPECT_EQ(reported_size, data.size());
 }

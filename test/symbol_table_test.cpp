@@ -1,12 +1,12 @@
 // =============================================================================
 // GSST — Symbol table tests
 // =============================================================================
+#include <cstdint>
 #include <cstring>
 #include <gsst/detail/common.hpp>
 #include <gsst/detail/symbol_table.hpp>
 #include <gtest/gtest.h>
 #include <string>
-#include <vector>
 
 using namespace gsst::detail;
 
@@ -25,11 +25,11 @@ TEST(SymbolTableTest, BuildFromSample) {
 
     // There should be symbols for frequent characters
     bool found_symbol = false;
-    for (int i = 0; i < MAX_SYMBOLS; ++i) {
-        if (decoder.len[i] > 0) {
+    for (const auto len_val : decoder.len) {
+        if (len_val > 0) {
             found_symbol = true;
-            EXPECT_GE(decoder.len[i], 1);
-            EXPECT_LE(decoder.len[i], MAX_SYMBOL_LEN);
+            EXPECT_GE(len_val, 1);
+            EXPECT_LE(len_val, MAX_SYMBOL_LEN);
             break;
         }
     }
@@ -48,12 +48,12 @@ TEST(SymbolTableTest, ExportImportRoundtrip) {
 
     // Export
     uint8_t buf[2200];
-    size_t exported_size = original.export_to(buf, sizeof(buf));
+    const size_t exported_size = original.export_to(buf, sizeof(buf));
     ASSERT_GT(exported_size, 0u);
 
     // Import
     DecoderTable imported{};
-    size_t imported_size = imported.import_from(buf, exported_size);
+    const size_t imported_size = imported.import_from(buf, exported_size);
     ASSERT_GT(imported_size, 0u);
 
     // Compare
@@ -61,24 +61,27 @@ TEST(SymbolTableTest, ExportImportRoundtrip) {
     EXPECT_EQ(imported.zero_terminated, original.zero_terminated);
 
     // Count symbols in both tables
-    int orig_count = 0, imp_count = 0;
-    for (int i = 0; i < MAX_SYMBOLS; ++i) {
-        if (original.len[i] > 0)
+    int orig_count = 0;
+    int imp_count = 0;
+    for (uint16_t i = 0; i < MAX_SYMBOLS; ++i) {
+        if (original.len[i] > 0) {
             orig_count++;
-        if (imported.len[i] > 0)
+        }
+        if (imported.len[i] > 0) {
             imp_count++;
+        }
     }
     EXPECT_EQ(orig_count, imp_count);
 
     // The imported table should contain the same symbol data
     // (possibly reordered by length group, which is fine)
-    for (int i = 0; i < MAX_SYMBOLS; ++i) {
+    for (uint16_t i = 0; i < MAX_SYMBOLS; ++i) {
         if (original.len[i] > 0) {
             // Find this symbol in the imported table
             bool found = false;
-            for (int j = 0; j < MAX_SYMBOLS; ++j) {
+            for (uint16_t j = 0; j < MAX_SYMBOLS; ++j) {
                 if (imported.len[j] == original.len[i]) {
-                    uint64_t mask = (original.len[i] < 8) ? ((1ULL << (original.len[i] * 8)) - 1) : ~0ULL;
+                    const uint64_t mask = (original.len[i] < 8) ? ((1ULL << (original.len[i] * 8)) - 1) : ~0ULL;
                     if ((imported.symbol[j] & mask) == (original.symbol[i] & mask)) {
                         found = true;
                         break;

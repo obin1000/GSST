@@ -1,6 +1,7 @@
 // =============================================================================
 // GSST — Codec edge-case and stress tests
 // =============================================================================
+#include <cstdint>
 #include <cstring>
 #include <gsst/gsst.hpp>
 #include <gtest/gtest.h>
@@ -20,7 +21,7 @@ TEST_F(CodecEdgeCaseTest, EmptyInput) {
 }
 
 TEST_F(CodecEdgeCaseTest, SingleByte) {
-  uint8_t src = 0x42;
+  const uint8_t src = 0x42;
   const size_t bound = gsst::compress_bound(1);
   std::vector<uint8_t> compressed(bound);
   std::vector<uint8_t> decompressed(1);
@@ -130,7 +131,7 @@ TEST_F(CodecEdgeCaseTest, MultipleBlockCompression) {
 }
 
 TEST_F(CodecEdgeCaseTest, StringConvenienceApi) {
-  std::string input = "Convenience API round-trip test!";
+  const std::string input = "Convenience API round-trip test!";
   auto compressed = codec.compress(input);
   ASSERT_FALSE(compressed.empty());
 

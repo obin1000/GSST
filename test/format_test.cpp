@@ -1,6 +1,7 @@
 // =============================================================================
 // GSST — Format header tests
 // =============================================================================
+#include <cstdint>
 #include <cstring>
 #include <gsst/detail/common.hpp>
 #include <gsst/detail/format.hpp>
@@ -16,15 +17,15 @@ TEST(FileHeaderTest, WriteAndReadRoundtrip) {
   original.version = static_cast<uint32_t>(FORMAT_VERSION);
   original.layout = 1;
   std::memset(original.reserved, 0, sizeof(original.reserved));
-  original.uncompressed_size = 1024 * 1024;
-  original.compressed_size = 512 * 1024;
+  original.uncompressed_size = static_cast<uint64_t>(1024) * 1024;
+  original.compressed_size = static_cast<uint64_t>(512) * 1024;
   original.num_tables = 1;
   original.num_blocks = 4;
   original.table_section_size = 2048;
   original.splits_per_block = 32;
 
   std::vector<uint8_t> buf(sizeof(FileHeader));
-  size_t written = write_file_header(buf.data(), original);
+  const size_t written = write_file_header(buf.data(), original);
   ASSERT_EQ(written, sizeof(FileHeader));
   ASSERT_EQ(written, 48u);
 
@@ -68,7 +69,7 @@ TEST(FileHeaderTest, OffsetCalculations) {
   EXPECT_EQ(table_section_offset(), sizeof(FileHeader));
   EXPECT_EQ(block_descriptors_offset(hdr), sizeof(FileHeader) + 2048);
   EXPECT_EQ(data_section_offset(hdr),
-            sizeof(FileHeader) + 2048 + 4 * sizeof(BlockDescriptor));
+            sizeof(FileHeader) + 2048 + (4 * sizeof(BlockDescriptor)));
 }
 
 TEST(SerializationTest, BigEndianRoundtrip) {

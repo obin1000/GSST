@@ -1,6 +1,7 @@
 // =============================================================================
 // GSST — C API tests
 // =============================================================================
+#include <cstdint>
 #include <cstring>
 #include <gsst/gsst.h>
 #include <gtest/gtest.h>
@@ -37,7 +38,7 @@ TEST(CApiTest, CompressDecompressRoundtrip) {
     input += "Hello GSST C API! ";
   }
 
-  size_t bound = gsst_compress_bound(input.size(), GSST_LAYOUT_BLOCKS);
+  const size_t bound = gsst_compress_bound(input.size(), GSST_LAYOUT_BLOCKS);
   std::vector<uint8_t> compressed(bound);
   size_t compressed_size = 0;
 
@@ -49,7 +50,7 @@ TEST(CApiTest, CompressDecompressRoundtrip) {
   ASSERT_GT(compressed_size, 0u);
 
   // Query decompressed size
-  size_t decomp_size =
+  const size_t decomp_size =
       gsst_get_decompressed_size(compressed.data(), compressed_size);
   ASSERT_EQ(decomp_size, input.size());
 
